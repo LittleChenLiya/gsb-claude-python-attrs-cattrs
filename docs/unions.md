@@ -72,6 +72,66 @@ Literals can now be potentially used to disambiguate.
 Dataclasses are now supported in addition to _attrs_ classes.
 ```
 
+## Diagnostic Structuring
+
+The default union strategy uses a disambiguation function to pick a single member, so when a payload cannot be structured, the error only describes the disambiguated branch.
+To see *why each member* is unsuitable, use {meth}`structure_diagnostic <cattrs.BaseConverter.structure_diagnostic>`:
+
+```python
+>>> from typing import Union
+>>> from attrs import define
+>>> from cattrs import Converter, transform_error
+>>>
+>>> @define
+... class A:
+...     x: int
+...
+>>> @define
+... class B:
+...     y: str
+...
+>>> converter = Converter()
+>>> try:
+...     converter.structure_diagnostic({"x": "bad"}, Union[A, B])
+... except Exception as exc:
+...     for line in transform_error(exc):
+...         print(line)
+invalid value for type, expected int @ $.A.x
+required field missing @ $.B.y
+```
+
+Every member is tried exactly once, in registration order, and the nested field errors of each failing branch are kept intact.
+When no member succeeds, a {class}`~cattrs.errors.UnionValidationError` is raised; its `exceptions` attribute holds the member errors in registration order, each annotated with a {class}`~cattrs.errors.UnionMemberValidationNote` identifying the member.
+
+`structure_diagnostic` is a separate entry point; the default {meth}`structure <cattrs.BaseConverter.structure>` is unchanged.
+
+### Branch Selection
+
+Members are tried in the order they appear in the union.
+Without `strict`, the first successful member's value is returned.
+With `strict=True`, an {class}`~cattrs.errors.AmbiguousUnionStructureError` is raised when more than one member succeeds, reporting all successful members and their results:
+
+```python
+>>> converter.structure_diagnostic({"x": 1, "y": "s"}, Union[A, B])
+A(x=1)
+>>> converter.structure_diagnostic({"x": 1, "y": "s"}, Union[A, B], strict=True)
+Traceback (most recent call last):
+...
+AmbiguousUnionStructureError: While structuring typing.Union[...], more than one union member succeeded: A, B
+```
+
+### Side-Effect Boundaries
+
+Diagnostic structuring invokes each member's structure hook through the normal hook dispatch, so custom hooks and hook factories take precedence exactly as they do for `structure`.
+This has a few consequences:
+
+- Each member's hook is invoked **at most once**, even if it fails.
+- Hooks may have side effects (mutating the payload, external calls, registering state); these happen for every member tried, since each member is actually structured.
+- A failed member's partially structured result is **discarded** and never returned.
+- A hook registered for the union itself is **bypassed**; only member hooks are consulted.
+
+Diagnostic structuring is therefore intended for error reporting and debugging, not for the common structuring path.
+
 ## Unstructuring Unions with Extra Metadata
 
 ```{note}

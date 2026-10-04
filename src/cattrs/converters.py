@@ -85,10 +85,13 @@ from .dispatch import (
 )
 from .enums import enum_structure_factory, enum_unstructure_factory
 from .errors import (
+    AmbiguousUnionStructureError,
     CattrsError,
     IterableValidationError,
     IterableValidationNote,
     StructureHandlerNotFoundError,
+    UnionMemberValidationNote,
+    UnionValidationError,
 )
 from .fns import Predicate, identity, raise_error
 from .gen import (
@@ -174,6 +177,13 @@ def _is_extended_factory(factory: Callable) -> bool:
         len(sig.parameters) >= 2
         and (list(sig.parameters.values())[1]).default is Signature.empty
     )
+
+
+def _member_name(member: Any) -> str:
+    """A readable name for a union member type."""
+    if member is None:
+        return "None"
+    return getattr(member, "__name__", None) or repr(member)
 
 
 class BaseConverter:
@@ -615,6 +625,116 @@ class BaseConverter:
             stronger type hints.
         """
         return self._structure_func.dispatch(cl)(obj, cl)
+
+    def structure_diagnostic(
+        self, obj: UnstructuredValue, cl: TypeForm[T], *, strict: bool = False
+    ) -> T:
+        """Diagnostically structure *obj* as the union type *cl*.
+
+        Unlike `structure`, which uses a disambiguation strategy to pick a
+        single union member, this method tries every member of the union in
+        registration order and reports the outcome. It is intended for
+        diagnosing *why* a union payload cannot be structured, not for the
+        common case.
+
+        Each member's structure hook is invoked at most once, through the
+        normal hook dispatch machinery, so custom hooks and hook factories
+        take precedence exactly as they do for `structure`. A hook registered
+        for the union itself is bypassed; only the member hooks are consulted.
+
+        Homogeneous sequences of unions (such as ``list[Union[A, B]]``) are
+        also supported: each element is diagnosed separately, and failures
+        are collected with their index paths.
+
+        Failed members have no effect on the converter: their exceptions are
+        collected and annotated, and any partially structured result is
+        discarded.
+
+        :param obj: The unstructured data.
+        :param cl: The target union type.
+        :param strict: If True, raise an `AmbiguousUnionStructureError` when
+            more than one member succeeds instead of returning the first match.
+
+        :return: The structured value from the first successful member.
+        :raises UnionValidationError: when every member fails. The member
+            exceptions are in registration order, with nested field errors
+            preserved.
+        :raises AmbiguousUnionStructureError: in strict mode when more than
+            one member succeeds.
+        """
+        if is_union_type(cl):
+            return self._structure_union_diagnostic(obj, cl, strict)
+
+        if (
+            is_sequence(cl)
+            and not is_bare(cl)
+            and not is_typeddict(cl)
+            and len(cl.__args__) == 1
+            and is_union_type(cl.__args__[0])
+        ):
+            return self._structure_union_sequence_diagnostic(
+                obj, cl, cl.__args__[0], strict
+            )
+
+        return self.structure(obj, cl)
+
+    def _structure_union_diagnostic(
+        self, obj: UnstructuredValue, cl: Any, strict: bool
+    ) -> Any:
+        union_args = cl.__args__
+        if NoneType in union_args:
+            if obj is None:
+                return None
+            members = tuple(m for m in union_args if m is not NoneType)
+        else:
+            members = union_args
+
+        successes: list[tuple[Any, Any]] = []
+        failures: list[Exception] = []
+        for member in members:
+            hook = self._structure_func.dispatch(member)
+            try:
+                result = hook(obj, member)
+            except Exception as exc:
+                note = UnionMemberValidationNote(
+                    f"Union member {_member_name(member)} failed to structure", member
+                )
+                exc.__notes__ = [*getattr(exc, "__notes__", []), note]
+                failures.append(exc)
+            else:
+                successes.append((member, result))
+
+        if successes:
+            if strict and len(successes) > 1:
+                raise AmbiguousUnionStructureError(cl, successes)
+            return successes[0][1]
+
+        raise UnionValidationError(
+            f"While diagnostically structuring {cl!r}, every union member failed",
+            failures,
+            cl,
+        )
+
+    def _structure_union_sequence_diagnostic(
+        self, obj: Iterable, cl: Any, elem_type: Any, strict: bool
+    ) -> Any:
+        errors = []
+        res = []
+        ix = 0
+        for e in obj:
+            try:
+                res.append(self._structure_union_diagnostic(e, elem_type, strict))
+            except UnionValidationError as exc:
+                msg = IterableValidationNote(
+                    f"Structuring {cl} @ index {ix}", ix, elem_type
+                )
+                exc.__notes__ = [*getattr(exc, "__notes__", []), msg]
+                errors.append(exc)
+            finally:
+                ix += 1
+        if errors:
+            raise IterableValidationError(f"While structuring {cl!r}", errors, cl)
+        return type(obj)(res)
 
     def get_structure_hook(
         self, type: TypeForm[T], cache_result: bool = True

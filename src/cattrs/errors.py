@@ -115,6 +115,57 @@ class ClassValidationError(BaseValidationError):
         return excs_with_notes, other_excs
 
 
+class UnionMemberValidationNote(str):
+    """Attached as a note to an exception when a union member fails structuring.
+
+    The note identifies the union member that was attempted, so diagnostic
+    reports can attribute nested field errors to the branch that produced them.
+    """
+
+    type: Any
+
+    def __new__(cls, string: str, type: Any) -> Self:
+        instance = str.__new__(cls, string)
+        instance.type = type
+        return instance
+
+    def __getnewargs__(self) -> tuple[str, Any]:
+        return (str(self), self.type)
+
+
+class UnionValidationError(BaseValidationError):
+    """Raised when diagnostically structuring a union fails for every member.
+
+    The exceptions of the individual members are available in
+    :attr:`BaseExceptionGroup.exceptions`, in registration order. Each member
+    exception is annotated with a `UnionMemberValidationNote` identifying the
+    member type, and any nested field notes are preserved untouched.
+    """
+
+
+class AmbiguousUnionStructureError(CattrsError):
+    """Raised in strict mode when diagnostically structuring a union succeeds
+    for more than one member.
+
+    The successful members and their structured results are available in
+    :attr:`successes`, in registration order.
+    """
+
+    def __init__(self, union: Any, successes: Sequence[tuple[Any, Any]]) -> None:
+        self.union = union
+        self.successes = list(successes)
+        names = ", ".join(_member_name(member) for member, _ in self.successes)
+        super().__init__(
+            f"While structuring {union!r}, more than one union member succeeded: {names}"
+        )
+
+
+def _member_name(member: Any) -> str:
+    if member is None:
+        return "None"
+    return getattr(member, "__name__", None) or repr(member)
+
+
 class ForbiddenExtraKeysError(CattrsError):
     """
     Raised when `forbid_extra_keys` is activated and such extra keys are detected

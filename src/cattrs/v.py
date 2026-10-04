@@ -6,6 +6,8 @@ from .errors import (
     ClassValidationError,
     ForbiddenExtraKeysError,
     IterableValidationError,
+    UnionMemberValidationNote,
+    UnionValidationError,
 )
 
 __all__ = ["format_exception", "transform_error"]
@@ -53,6 +55,20 @@ def format_exception(exc: BaseException, type: Union[type, None]) -> str:
     return res
 
 
+def _find_union_member_note(exc: BaseException) -> UnionMemberValidationNote | None:
+    """Find the `UnionMemberValidationNote` attached to an exception, if any."""
+    for note in getattr(exc, "__notes__", []):
+        if isinstance(note, UnionMemberValidationNote):
+            return note
+    return None
+
+
+def _member_name(member: object) -> str:
+    if member is None:
+        return "None"
+    return getattr(member, "__name__", None) or repr(member)
+
+
 def transform_error(
     exc: Union[ClassValidationError, IterableValidationError, BaseException],
     path: str = "$",
@@ -72,6 +88,7 @@ def transform_error(
     * by appending `.{field_name}` for fields in classes
     * by appending `[{int}]` for indices in iterables, like lists
     * by appending `[{str}]` for keys in mappings, like dictionaries
+    * by appending `.{member_name}` for members of diagnostically structured unions
 
     :param exc: The exception to transform into error messages.
     :param path: The root path to use.
@@ -85,17 +102,32 @@ def transform_error(
         with_notes, without = exc.group_exceptions()
         for exc, note in with_notes:
             p = f"{path}[{note.index!r}]"
-            if isinstance(exc, (ClassValidationError, IterableValidationError)):
+            if isinstance(
+                exc,
+                (ClassValidationError, IterableValidationError, UnionValidationError),
+            ):
                 errors.extend(transform_error(exc, p, format_exception))
             else:
                 errors.append(f"{format_exception(exc, note.type)} @ {p}")
         for exc in without:
             errors.append(f"{format_exception(exc, None)} @ {path}")
+    elif isinstance(exc, UnionValidationError):
+        for subexc in exc.exceptions:
+            note = _find_union_member_note(subexc)
+            member = note.type if note is not None else None
+            p = f"{path}.{_member_name(member)}"
+            if isinstance(subexc, (ClassValidationError, IterableValidationError)):
+                errors.extend(transform_error(subexc, p, format_exception))
+            else:
+                errors.append(f"{format_exception(subexc, member)} @ {p}")
     elif isinstance(exc, ClassValidationError):
         with_notes, without = exc.group_exceptions()
         for exc, note in with_notes:
             p = f"{path}.{note.name}"
-            if isinstance(exc, (ClassValidationError, IterableValidationError)):
+            if isinstance(
+                exc,
+                (ClassValidationError, IterableValidationError, UnionValidationError),
+            ):
                 errors.extend(transform_error(exc, p, format_exception))
             else:
                 errors.append(f"{format_exception(exc, note.type)} @ {p}")

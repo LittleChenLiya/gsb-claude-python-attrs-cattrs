@@ -12,6 +12,10 @@ lint:
 test *args="-x --ff -n auto tests":
     uv run {{ if python != '' { '-p ' + python } else { '' } }} --all-extras --group test --group lint pytest {{args}}
 
+# Run a small, deterministic local test suite quickly (no benchmarks).
+test-local *args="-x -q tests/test_structure_diagnostic.py tests/test_unions.py tests/test_validation.py":
+    uv run {{ if python != '' { '-p ' + python } else { '' } }} --group test pytest {{args}}
+
 testall:
     just python=python3.10 test
     just python=pypy3.10 test
