@@ -115,6 +115,57 @@ class ClassValidationError(BaseValidationError):
         return excs_with_notes, other_excs
 
 
+class UnionStructureError(BaseValidationError):
+    """Raised by diagnostic union structuring when no branch of the union succeeds.
+
+    The sub-exceptions (:attr:`exceptions`) contain one error per union branch,
+    in the order the branches are declared in the union; :attr:`branches` holds
+    the branch types in the same order. Nested field errors (such as
+    :class:`ClassValidationError` and :class:`IterableValidationError`) are kept
+    intact, so every branch's reason for failing is preserved instead of only
+    the last branch's exception.
+
+    .. versionadded:: NEXT
+    """
+
+    branches: tuple[Any, ...]
+
+    def __new__(
+        cls,
+        message: str,
+        excs: Sequence[Exception],
+        cl: type,
+        branches: tuple[Any, ...] = (),
+    ) -> Self:
+        obj = super().__new__(cls, message, excs, cl)
+        obj.branches = branches
+        return obj
+
+    def derive(self, excs: Sequence[Exception]) -> Self:
+        return self.__class__(self.message, excs, self.cl, self.branches)
+
+
+class UnionAmbiguityError(CattrsError):
+    """Raised by diagnostic union structuring in strict ambiguity mode when more
+    than one branch of the union structures the input successfully.
+
+    :attr:`successes` is a list of ``(branch, structured value)`` pairs, in the
+    order the branches are declared in the union. All values are fully
+    structured; no partially-built results are exposed.
+
+    .. versionadded:: NEXT
+    """
+
+    def __init__(self, message: str, cl: Any, successes: list[tuple[Any, Any]]) -> None:
+        super().__init__(message, cl, successes)
+        self.message = message
+        self.cl = cl
+        self.successes = successes
+
+    def __str__(self) -> str:
+        return self.message
+
+
 class ForbiddenExtraKeysError(CattrsError):
     """
     Raised when `forbid_extra_keys` is activated and such extra keys are detected

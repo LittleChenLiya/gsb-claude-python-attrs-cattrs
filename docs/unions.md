@@ -130,3 +130,72 @@ structuring hook to put it to use:
 >>> converter.structure({"_type": "ClassA", "a_string": "test"}, Union[ClassA, ClassB])
 ClassA(a_string='test')
 ```
+
+## Diagnostic Union Structuring
+
+When a union fails to structure, the default strategy only surfaces the error
+of the single branch it selected, which can leave you guessing why the other
+branches did not match. `structure_diagnostic` is an explicit, opt-in entry
+point (available on all converters and as `cattrs.structure_diagnostic`) which
+instead tries every branch and reports each branch's reason for failing.
+The default `structure` behavior is unchanged.
+
+```python
+>>> from typing import Union
+>>> from attrs import define
+>>> from cattrs import Converter, UnionStructureError
+
+>>> @define
+... class A:
+...     x: int
+
+>>> @define
+... class B:
+...     y: str
+
+>>> converter = Converter()
+>>> try:
+...     converter.structure_diagnostic({"x": "bad"}, Union[A, B])
+... except UnionStructureError as exc:
+...     print(len(exc.exceptions))  # one error per branch, in declaration order
+2
+```
+
+Here the report contains branch `A`'s error (`x` failed to structure) *and*
+branch `B`'s error (`y` is missing), with nested field errors
+(`ClassValidationError`/`IterableValidationError` and their notes) kept intact,
+so `cattrs.transform_error` still produces full paths for each branch.
+
+### Branch Selection
+
+- Branches are attempted in the order they are declared in the union, and each
+  branch is attempted **at most once** per call.
+- Each branch is structured through the converter's normal hook dispatch, so
+  custom hooks registered for branch types keep their existing registration
+  priority. A hook registered for the exact union itself also takes priority,
+  exactly as with `structure`, and is called at most once.
+- If exactly one branch succeeds, its structured value is returned directly -
+  the original converted type, not a wrapper.
+- If no branch succeeds, a {class}`UnionStructureError <cattrs.errors.UnionStructureError>`
+  is raised; its `exceptions` hold every branch's error in registration order
+  (not just the last branch's), and `branches` holds the matching branch types.
+- If several branches succeed, the `strict_ambiguity` parameter (on by default)
+  applies: a {class}`UnionAmbiguityError <cattrs.errors.UnionAmbiguityError>`
+  is raised as an ambiguity report, carrying all successful `(branch, value)`
+  pairs. With `strict_ambiguity=False`, the first successful branch in
+  registration order wins.
+
+### Side-effect Boundary
+
+Diagnostic structuring is not side-effect free: to detect ambiguity, **all**
+branches are attempted even after one succeeds, so a structuring hook with
+side effects observes exactly one call per branch per invocation. Failures
+only ever raise - partially-structured ("half-built") results are never
+returned to the caller; the ambiguity report only contains fully-structured
+values.
+
+The tests for this feature can be run locally with:
+
+```bash
+python -m pytest tests/test_structure_diagnostic.py -q
+```

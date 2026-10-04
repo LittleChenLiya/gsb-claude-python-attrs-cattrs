@@ -89,6 +89,8 @@ from .errors import (
     IterableValidationError,
     IterableValidationNote,
     StructureHandlerNotFoundError,
+    UnionAmbiguityError,
+    UnionStructureError,
 )
 from .fns import Predicate, identity, raise_error
 from .gen import (
@@ -615,6 +617,86 @@ class BaseConverter:
             stronger type hints.
         """
         return self._structure_func.dispatch(cl)(obj, cl)
+
+    def structure_diagnostic(
+        self, obj: UnstructuredValue, cl: TypeForm[T], *, strict_ambiguity: bool = True
+    ) -> T:
+        """Structure ``obj`` into ``cl``, diagnosing union branches individually.
+
+        This is an explicit, opt-in variant of :meth:`structure` for union
+        types; the default :meth:`structure` behavior is unchanged.
+
+        For non-union targets this behaves exactly like :meth:`structure`.
+        For unions, each branch is attempted **at most once**, in the order
+        the branches are declared in the union, using this converter's normal
+        hook dispatch so custom hooks keep their existing registration
+        priority. A hook registered for the exact union itself (via
+        :meth:`register_structure_hook`) takes priority and is called at most
+        once, exactly as with :meth:`structure`.
+
+        On a single successful branch, the structured value is returned
+        directly (the original converted type, not a wrapper). If no branch
+        succeeds, a :class:`UnionStructureError <cattrs.errors.UnionStructureError>`
+        is raised containing every branch's error (with nested field errors
+        intact) in branch registration order - not just the last branch's
+        exception. No partially-structured results are returned to the caller.
+
+        If more than one branch succeeds and ``strict_ambiguity`` is true
+        (the default), a :class:`UnionAmbiguityError <cattrs.errors.UnionAmbiguityError>`
+        is raised as an ambiguity report, carrying all successful
+        ``(branch, value)`` pairs. If ``strict_ambiguity`` is false, the first
+        successful branch's value (in registration order) is returned.
+
+        Note that all branches are attempted even after a success (to detect
+        ambiguity), so structuring hooks with side effects will observe
+        exactly one call per branch per invocation.
+
+        :param strict_ambiguity: Whether multiple successful branches are
+            reported as an ambiguity error instead of resolving to the first
+            successful branch.
+
+        .. versionadded:: NEXT
+        """
+        if not is_union_type(cl):
+            return self.structure(obj, cl)
+
+        # A hook registered for this exact union keeps its usual priority.
+        custom = self._union_struct_registry.get(cl)
+        if custom is not None:
+            return custom(obj, cl)
+
+        branches = cl.__args__
+        successes: list[tuple[Any, Any]] = []
+        errors: list[Exception] = []
+        for branch in branches:
+            try:
+                if branch is NoneType:
+                    if obj is None:
+                        res = None
+                    else:
+                        raise ValueError(f"{obj!r} is not None")
+                else:
+                    res = self._structure_func.dispatch(branch)(obj, branch)
+            except Exception as exc:
+                errors.append(exc)
+            else:
+                successes.append((branch, res))
+
+        if not successes:
+            raise UnionStructureError(
+                f"While structuring {cl!r}", errors, cl, tuple(branches)
+            )
+        if len(successes) > 1 and strict_ambiguity:
+            names = ", ".join(
+                getattr(b, "__qualname__", None) or repr(b) for b, _ in successes
+            )
+            raise UnionAmbiguityError(
+                f"Ambiguous structuring into {cl!r}: "
+                f"{len(successes)} branches succeeded ({names})",
+                cl,
+                successes,
+            )
+        return successes[0][1]
 
     def get_structure_hook(
         self, type: TypeForm[T], cache_result: bool = True

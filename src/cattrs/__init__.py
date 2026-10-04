@@ -9,6 +9,8 @@ from .errors import (
     IterableValidationError,
     IterableValidationNote,
     StructureHandlerNotFoundError,
+    UnionAmbiguityError,
+    UnionStructureError,
 )
 from .gen import override
 from .types import SimpleStructureHook
@@ -26,6 +28,8 @@ __all__ = [
     "IterableValidationNote",
     "SimpleStructureHook",
     "StructureHandlerNotFoundError",
+    "UnionAmbiguityError",
+    "UnionStructureError",
     "UnstructureStrategy",
     "get_structure_hook",
     "get_unstructure_hook",
@@ -38,6 +42,7 @@ __all__ = [
     "structure",
     "structure_attrs_fromdict",
     "structure_attrs_fromtuple",
+    "structure_diagnostic",
     "transform_error",
     "unstructure",
 ]
@@ -47,6 +52,7 @@ global_converter: Final = Converter()
 
 unstructure = global_converter.unstructure
 structure = global_converter.structure
+structure_diagnostic = global_converter.structure_diagnostic
 structure_attrs_fromtuple = global_converter.structure_attrs_fromtuple
 structure_attrs_fromdict = global_converter.structure_attrs_fromdict
 register_structure_hook = global_converter.register_structure_hook

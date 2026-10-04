@@ -13,6 +13,10 @@ Our backwards-compatibility policy can be found [here](https://github.com/python
 
 ## NEXT
 
+- Add {meth}`BaseConverter.structure_diagnostic <cattrs.BaseConverter.structure_diagnostic>` (also available as `cattrs.structure_diagnostic`), an explicit diagnostic structuring entry point for unions.
+  Each union branch is attempted at most once, in declaration order and using the converter's normal hook priority; failures raise {class}`cattrs.UnionStructureError` with every branch's nested errors preserved, and multiple successes are reported as {class}`cattrs.UnionAmbiguityError` in strict ambiguity mode.
+  See [Diagnostic Union Structuring](https://catt.rs/en/latest/unions.html#diagnostic-union-structuring).
+
 - Dict unstructuring hook factories now inherit the converter's `omit_if_default` setting when `_cattrs_omit_if_default` is omitted. Explicit `True` or `False` values and per-attribute overrides retain their precedence.
   ([#238](https://github.com/python-attrs/cattrs/issues/238))
 - Support the [`frozendict`](https://docs.python.org/3.15/builtins/stdtypes.html#frozendict) built-in on Python 3.15+.
