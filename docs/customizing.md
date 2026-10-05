@@ -175,6 +175,70 @@ Here's an example of using an unstructure hook factory to handle unstructuring [
 [1, 2]
 ```
 
+## Explaining Hook Selection
+
+{meth}`Converter.explain_structure_hook() <cattrs.BaseConverter.explain_structure_hook>` and
+{meth}`Converter.explain_unstructure_hook() <cattrs.BaseConverter.explain_unstructure_hook>`
+report which hook (or hook factory) the converter's real dispatch rules would select for a
+type, without calling any hook or hook factory, and without touching the dispatch caches.
+
+The selection follows the real dispatch priority:
+
+1. concrete class hooks (registered for a class, via `singledispatch`)
+2. direct dispatch (exact types, including generic aliases, used as-is so generic
+   parameter identity is preserved)
+3. predicate hooks and predicate hook factories, newest registration first; each predicate is
+   evaluated at most once, exactly where the real dispatch would evaluate it, and
+   evaluation stops at the first match
+4. the converter fallback factory
+
+```python
+>>> from attrs import define
+>>> from cattrs import Converter, HookSelectionKind
+
+>>> @define
+... class C:
+...     a: int
+
+>>> c = Converter()
+>>> _ = c.register_structure_hook_func(lambda t: True, lambda v, t: C(0))  # predicate hook
+>>> _ = c.register_structure_hook(C, lambda v, t: C(v["a"]))  # concrete hook
+
+>>> # Concrete hooks take priority over predicate hooks.
+>>> selection = c.explain_structure_hook(C)
+>>> selection.kind
+<HookSelectionKind.SINGLE_DISPATCH: 'single_dispatch'>
+
+>>> print(selection.describe())  # doctest: +SKIP
+Hook selection for <class 'C'>:
+  concrete class hook (singledispatch): hit <function ...> (registered for <class 'C'>)
+```
+
+Factory selections are distinguished from plain hook selections; the selected factory is
+reported but not called. Use {meth}`HookSelection.realize() <cattrs.dispatch.HookSelection.realize>`
+to explicitly produce the hook from a factory selection.
+
+```python
+>>> c2 = Converter()
+>>> _ = c2.register_structure_hook_factory(lambda t: t is C, lambda t: lambda v, _: C(1))
+
+>>> selection = c2.explain_structure_hook(C)
+>>> selection.kind
+<HookSelectionKind.PREDICATE_FACTORY: 'predicate_factory'>
+>>> selection.is_factory
+True
+```
+
+Since predicates may have side effects, `allow_unknown_predicates=False` can be passed to
+refuse evaluating any predicate not listed in `known_pure_predicates` (matched by identity);
+a {class}`cattrs.PredicateRefusedError` is raised instead of evaluating an unknown predicate.
+
+The acceptance tests for this feature can be run with:
+
+```bash
+pytest tests/test_explain_dispatch.py -v
+```
+
 ## Using `cattrs.gen` Hook Factories
 
 The {mod}`cattrs.gen` module contains [hook factories](#hook-factories) for un/structuring _attrs_ classes, dataclasses and typed dicts.

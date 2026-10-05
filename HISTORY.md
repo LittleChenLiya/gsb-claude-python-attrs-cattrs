@@ -13,6 +13,10 @@ Our backwards-compatibility policy can be found [here](https://github.com/python
 
 ## NEXT
 
+- Add {meth}`BaseConverter.explain_structure_hook` and {meth}`BaseConverter.explain_unstructure_hook`,
+  explicit hook selection explainers which report the hook (or hook factory) the real dispatch rules
+  would select for a type, without calling any hook or factory and without touching the dispatch caches.
+  See {class}`cattrs.HookSelection` and {class}`cattrs.HookSelectionKind`.
 - Dict unstructuring hook factories now inherit the converter's `omit_if_default` setting when `_cattrs_omit_if_default` is omitted. Explicit `True` or `False` values and per-attribute overrides retain their precedence.
   ([#238](https://github.com/python-attrs/cattrs/issues/238))
 - Support the [`frozendict`](https://docs.python.org/3.15/builtins/stdtypes.html#frozendict) built-in on Python 3.15+.

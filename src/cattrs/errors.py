@@ -140,3 +140,27 @@ class ForbiddenExtraKeysError(CattrsError):
             or f"Extra fields in constructor for {self.cl.__name__}: "
             f"{', '.join(sorted(self.extra_fields))}"
         )
+
+
+class PredicateRefusedError(CattrsError):
+    """
+    Raised when explaining hook selection would require evaluating a predicate
+    that has not been marked as pure (side-effect free).
+
+    The offending predicate is available as :attr:`predicate`, and the type
+    being explained as :attr:`type_`.
+
+    ..  versionadded:: NEXT
+    """
+
+    def __init__(self, predicate: Any, type_: Any) -> None:
+        super().__init__(predicate, type_)
+        self.predicate = predicate
+        self.type_ = type_
+
+    def __str__(self) -> str:
+        return (
+            f"Refusing to evaluate unknown predicate {self.predicate!r} for "
+            f"{self.type_!r}; mark it as pure via `known_pure_predicates` or "
+            "pass `allow_unknown_predicates=True`."
+        )

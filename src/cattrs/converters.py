@@ -76,6 +76,7 @@ from .cols import (
 from .disambiguators import create_default_dis_func, is_supported_union
 from .dispatch import (
     HookFactory,
+    HookSelection,
     MultiStrategyDispatch,
     StructuredValue,
     StructureHook,
@@ -490,6 +491,37 @@ class BaseConverter:
             else self._unstructure_func.dispatch_without_caching(type)
         )
 
+    def explain_unstructure_hook(
+        self,
+        type: Any,
+        *,
+        allow_unknown_predicates: bool = True,
+        known_pure_predicates: Iterable[Predicate] = (),
+    ) -> HookSelection[UnstructureHook]:
+        """Explain which unstructure hook would be selected for `type`.
+
+        Follows the converter's real dispatch rules (concrete class hooks
+        first, then direct dispatch, then predicate hooks and hook factories
+        in registration order, then the fallback factory) without calling any
+        hook or hook factory, and without touching the dispatch caches.
+
+        The type is used as-is, so generic parameters keep their identity.
+
+        :param allow_unknown_predicates: If False, refuse (by raising
+            :class:`cattrs.errors.PredicateRefusedError`) to evaluate any
+            predicate not present in `known_pure_predicates`, since it may
+            have side effects.
+        :param known_pure_predicates: Predicates known to be side-effect free,
+            matched by identity.
+
+        ..  versionadded:: NEXT
+        """
+        return self._unstructure_func.explain(
+            type,
+            allow_unknown_predicates=allow_unknown_predicates,
+            known_pure_predicates=known_pure_predicates,
+        )
+
     @overload
     def register_structure_hook(self, cl: StructureHookT) -> StructureHookT: ...
 
@@ -639,6 +671,37 @@ class BaseConverter:
             self._structure_func.dispatch(type)
             if cache_result
             else self._structure_func.dispatch_without_caching(type)
+        )
+
+    def explain_structure_hook(
+        self,
+        type: Any,
+        *,
+        allow_unknown_predicates: bool = True,
+        known_pure_predicates: Iterable[Predicate] = (),
+    ) -> HookSelection[StructureHook]:
+        """Explain which structure hook would be selected for `type`.
+
+        Follows the converter's real dispatch rules (concrete class hooks
+        first, then direct dispatch, then predicate hooks and hook factories
+        in registration order, then the fallback factory) without calling any
+        hook or hook factory, and without touching the dispatch caches.
+
+        The type is used as-is, so generic parameters keep their identity.
+
+        :param allow_unknown_predicates: If False, refuse (by raising
+            :class:`cattrs.errors.PredicateRefusedError`) to evaluate any
+            predicate not present in `known_pure_predicates`, since it may
+            have side effects.
+        :param known_pure_predicates: Predicates known to be side-effect free,
+            matched by identity.
+
+        ..  versionadded:: NEXT
+        """
+        return self._structure_func.explain(
+            type,
+            allow_unknown_predicates=allow_unknown_predicates,
+            known_pure_predicates=known_pure_predicates,
         )
 
     # Classes to Python primitives.

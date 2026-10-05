@@ -1,6 +1,7 @@
 from typing import Final
 
 from .converters import BaseConverter, Converter, GenConverter, UnstructureStrategy
+from .dispatch import HookSelection, HookSelectionKind, PredicateEvaluation
 from .errors import (
     AttributeValidationNote,
     BaseValidationError,
@@ -8,6 +9,7 @@ from .errors import (
     ForbiddenExtraKeysError,
     IterableValidationError,
     IterableValidationNote,
+    PredicateRefusedError,
     StructureHandlerNotFoundError,
 )
 from .gen import override
@@ -22,8 +24,12 @@ __all__ = [
     "Converter",
     "ForbiddenExtraKeysError",
     "GenConverter",
+    "HookSelection",
+    "HookSelectionKind",
     "IterableValidationError",
     "IterableValidationNote",
+    "PredicateEvaluation",
+    "PredicateRefusedError",
     "SimpleStructureHook",
     "StructureHandlerNotFoundError",
     "UnstructureStrategy",
