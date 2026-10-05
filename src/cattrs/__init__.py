@@ -10,6 +10,13 @@ from .errors import (
     IterableValidationNote,
     StructureHandlerNotFoundError,
 )
+from .explain import (
+    HookExplanation,
+    PredicateEvaluation,
+    UnknownPredicateError,
+    explain_structure_hook,
+    explain_unstructure_hook,
+)
 from .gen import override
 from .types import SimpleStructureHook
 from .v import transform_error
@@ -22,11 +29,16 @@ __all__ = [
     "Converter",
     "ForbiddenExtraKeysError",
     "GenConverter",
+    "HookExplanation",
     "IterableValidationError",
     "IterableValidationNote",
+    "PredicateEvaluation",
     "SimpleStructureHook",
     "StructureHandlerNotFoundError",
+    "UnknownPredicateError",
     "UnstructureStrategy",
+    "explain_structure_hook",
+    "explain_unstructure_hook",
     "get_structure_hook",
     "get_unstructure_hook",
     "global_converter",

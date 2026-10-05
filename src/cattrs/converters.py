@@ -90,6 +90,7 @@ from .errors import (
     IterableValidationNote,
     StructureHandlerNotFoundError,
 )
+from .explain import explain_structure_hook, explain_unstructure_hook
 from .fns import Predicate, identity, raise_error
 from .gen import (
     AttributeOverride,
@@ -490,6 +491,19 @@ class BaseConverter:
             else self._unstructure_func.dispatch_without_caching(type)
         )
 
+    def explain_unstructure_hook(
+        self, type: Any, *, reject_unknown_predicates: bool = False
+    ):
+        """Explain which unstructure hook would be selected for *type*.
+
+        See :func:`cattrs.explain.explain_unstructure_hook` for details.
+
+        .. versionadded:: NEXT
+        """
+        return explain_unstructure_hook(
+            self, type, reject_unknown_predicates=reject_unknown_predicates
+        )
+
     @overload
     def register_structure_hook(self, cl: StructureHookT) -> StructureHookT: ...
 
@@ -639,6 +653,19 @@ class BaseConverter:
             self._structure_func.dispatch(type)
             if cache_result
             else self._structure_func.dispatch_without_caching(type)
+        )
+
+    def explain_structure_hook(
+        self, type: Any, *, reject_unknown_predicates: bool = False
+    ):
+        """Explain which structure hook would be selected for *type*.
+
+        See :func:`cattrs.explain.explain_structure_hook` for details.
+
+        .. versionadded:: NEXT
+        """
+        return explain_structure_hook(
+            self, type, reject_unknown_predicates=reject_unknown_predicates
         )
 
     # Classes to Python primitives.
