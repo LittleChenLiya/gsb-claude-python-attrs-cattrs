@@ -59,6 +59,14 @@ cattrs.fns module
    :undoc-members:
    :show-inheritance:
 
+cattrs.tree module
+------------------
+
+.. automodule:: cattrs.tree
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 cattrs.v module
 ---------------
 

@@ -13,6 +13,12 @@ Our backwards-compatibility policy can be found [here](https://github.com/python
 
 ## NEXT
 
+- Add {mod}`cattrs.tree`, an explicit, read-only error organizing layer: {func}`cattrs.tree.build_error_tree` turns
+  [`IterableValidationError` and `ClassValidationError`](https://github.com/python-attrs/cattrs) into an immutable path tree
+  keyed by real attribute names, indices and mapping keys.
+  It supports capping the number of kept leaf errors via `max_leaves` while preserving the total failure count, marks truncation
+  independently (`ErrorTree.truncated`, `Node.dropped`), records leaf causes as exception type names only (never input values),
+  and stops explicitly on cyclic `__cause__` chains and cyclic exception groups.
 - Dict unstructuring hook factories now inherit the converter's `omit_if_default` setting when `_cattrs_omit_if_default` is omitted. Explicit `True` or `False` values and per-attribute overrides retain their precedence.
   ([#238](https://github.com/python-attrs/cattrs/issues/238))
 - Support the [`frozendict`](https://docs.python.org/3.15/builtins/stdtypes.html#frozendict) built-in on Python 3.15+.

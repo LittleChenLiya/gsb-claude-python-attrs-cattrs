@@ -11,6 +11,7 @@ from .errors import (
     StructureHandlerNotFoundError,
 )
 from .gen import override
+from .tree import build_error_tree
 from .types import SimpleStructureHook
 from .v import transform_error
 
@@ -27,6 +28,7 @@ __all__ = [
     "SimpleStructureHook",
     "StructureHandlerNotFoundError",
     "UnstructureStrategy",
+    "build_error_tree",
     "get_structure_hook",
     "get_unstructure_hook",
     "global_converter",
