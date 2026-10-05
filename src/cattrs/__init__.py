@@ -10,6 +10,14 @@ from .errors import (
     IterableValidationNote,
     StructureHandlerNotFoundError,
 )
+from .errortree import (
+    ErrorBranch,
+    ErrorLeaf,
+    ErrorTree,
+    FieldName,
+    build_error_tree,
+    render_tree,
+)
 from .gen import override
 from .types import SimpleStructureHook
 from .v import transform_error
@@ -20,6 +28,10 @@ __all__ = [
     "BaseValidationError",
     "ClassValidationError",
     "Converter",
+    "ErrorBranch",
+    "ErrorLeaf",
+    "ErrorTree",
+    "FieldName",
     "ForbiddenExtraKeysError",
     "GenConverter",
     "IterableValidationError",
@@ -27,6 +39,7 @@ __all__ = [
     "SimpleStructureHook",
     "StructureHandlerNotFoundError",
     "UnstructureStrategy",
+    "build_error_tree",
     "get_structure_hook",
     "get_unstructure_hook",
     "global_converter",
@@ -35,6 +48,7 @@ __all__ = [
     "register_structure_hook_func",
     "register_unstructure_hook",
     "register_unstructure_hook_func",
+    "render_tree",
     "structure",
     "structure_attrs_fromdict",
     "structure_attrs_fromtuple",
